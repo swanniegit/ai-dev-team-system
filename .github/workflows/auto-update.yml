@@ -1,0 +1,199 @@
+name: Automated System Updates
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    # Allow manual trigger
+  repository_dispatch:
+    # Allow external triggers
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  system-health-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run system health checks
+      run: |
+        echo "## System Health Check Report" >> $GITHUB_STEP_SUMMARY
+        echo "**Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        
+        # Check agent implementations
+        echo "### Agent Status" >> $GITHUB_STEP_SUMMARY
+        for agent in pm_agent po sm dev qa ar ad mb; do
+          if [ -d "agents/$agent" ]; then
+            echo "- ✅ $agent agent: Present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ $agent agent: Missing" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+        
+        # Check documentation
+        echo "### Documentation Status" >> $GITHUB_STEP_SUMMARY
+        docs=("README.md" "SETUP.md" "DEPLOYMENT_SUMMARY.md" "AGENT_COMPLETION_SUMMARY.md" "MEMORY_SYSTEM_SUMMARY.md" "FUNCTIONAL_TECHNICAL_SPEC.md")
+        for doc in "${docs[@]}"; do
+          if [ -f "$doc" ]; then
+            echo "- ✅ $doc: Present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ $doc: Missing" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+        
+        # Check infrastructure
+        echo "### Infrastructure Status" >> $GITHUB_STEP_SUMMARY
+        if [ -f "docker-compose.yml" ]; then
+          echo "- ✅ Docker Compose: Present" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Docker Compose: Missing" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -d "k8s" ]; then
+          echo "- ✅ Kubernetes: Present" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Kubernetes: Missing" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  dependency-update:
+    runs-on: ubuntu-latest
+    needs: system-health-check
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Check for dependency updates
+      run: |
+        pip install pip-review
+        pip-review --local --output-format=json > dependency-updates.json
+        
+        # Check if there are updates
+        if [ -s dependency-updates.json ]; then
+          echo "## Dependency Updates Available" >> $GITHUB_STEP_SUMMARY
+          cat dependency-updates.json | jq -r '.[] | "- \(.package): \(.installed_version) → \(.latest_version)"' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## Dependencies are up to date" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: system-health-check
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run security scan
+      run: |
+        pip install bandit safety
+        
+        echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        
+        # Run Bandit
+        bandit -r . -f json -o bandit-report.json || true
+        if [ -s bandit-report.json ]; then
+          echo "### Bandit Security Issues" >> $GITHUB_STEP_SUMMARY
+          cat bandit-report.json | jq -r '.results[] | "- \(.issue_severity): \(.issue_text) in \(.filename):\(.line_number)"' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ✅ No Bandit security issues found" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Run Safety
+        safety check --json --output safety-report.json || true
+        if [ -s safety-report.json ]; then
+          echo "### Safety Check Results" >> $GITHUB_STEP_SUMMARY
+          cat safety-report.json | jq -r '.[] | "- \(.package): \(.vulnerability_id) - \(.advisory)"' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ✅ No Safety issues found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  create-update-issue:
+    runs-on: ubuntu-latest
+    needs: [dependency-update, security-scan]
+    if: always()
+    
+    steps:
+    - name: Create update issue
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read step summaries
+          const healthCheck = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+          
+          // Create issue body
+          const issueBody = `# 🔄 System Update Report
+          
+          ## 📊 Health Check Results
+          ${healthCheck}
+          
+          ## 🎯 Recommended Actions
+          
+          ### High Priority
+          - [ ] Review security scan results
+          - [ ] Update dependencies if needed
+          - [ ] Test all agents functionality
+          
+          ### Medium Priority
+          - [ ] Review documentation updates
+          - [ ] Check deployment configurations
+          - [ ] Update memory system if needed
+          
+          ### Low Priority
+          - [ ] Review GitHub templates
+          - [ ] Update README if needed
+          - [ ] Check CI/CD pipeline
+          
+          ## 📝 Notes
+          - This issue was automatically generated
+          - Review and close when updates are complete
+          - Consider creating a new release if major changes are made
+          `;
+          
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🔄 System Update Report - ${new Date().toISOString().split('T')[0]}`,
+            body: issueBody,
+            labels: ['automated', 'maintenance', 'system-update']
+          });
+
+  notify-team:
+    runs-on: ubuntu-latest
+    needs: [create-update-issue]
+    if: always()
+    
+    steps:
+    - name: Notify team
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#system-updates'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        text: |
+          Agentic Agile System update report generated
+          Repository: ${{ github.repository }}
+          Run: ${{ github.run_number }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }} 

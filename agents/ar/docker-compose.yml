@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  ar-agent:
+    build: .
+    container_name: ar-agent
+    environment:
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - API_HUB_URL=${API_HUB_URL:-http://localhost:8000}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GITLAB_API_URL=${GITLAB_API_URL}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./reviews:/app/reviews
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+    ports:
+      - "8004:8004"
+    restart: unless-stopped
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-agile-network
+
+  api-hub:
+    image: agentic-agile-api:latest
+    container_name: api-hub
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    networks:
+      - agentic-agile-network
+
+networks:
+  agentic-agile-network:
+    driver: bridge 

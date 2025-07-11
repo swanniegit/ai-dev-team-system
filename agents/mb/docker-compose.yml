@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mb-agent:
+    build: .
+    container_name: mb-agent
+    environment:
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - API_HUB_URL=${API_HUB_URL:-http://localhost:8000}
+      - SLACK_WEBHOOK=${SLACK_WEBHOOK}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./wellness_data:/app/wellness_data
+      - ./logs:/app/logs
+      - ./activities:/app/activities
+    ports:
+      - "8006:8006"
+    restart: unless-stopped
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-agile-network
+
+  api-hub:
+    image: agentic-agile-api:latest
+    container_name: api-hub
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    networks:
+      - agentic-agile-network
+
+networks:
+  agentic-agile-network:
+    driver: bridge 

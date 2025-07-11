@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: agentic_agile_postgres
+    environment:
+      POSTGRES_DB: agentic_agile
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d agentic_agile"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and event bus
+  redis:
+    image: redis:7-alpine
+    container_name: agentic_agile_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB for flexible data storage
+  mongodb:
+    image: mongo:7
+    container_name: agentic_agile_mongodb
+    environment:
+      MONGO_INITDB_DATABASE: agentic_agile
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Application
+  api:
+    build: .
+    container_name: agentic_agile_api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/agentic_agile
+      - MONGODB_URL=mongodb://mongodb:27017/agentic_agile
+      - REDIS_URL=redis://redis:6379
+      - DEBUG=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data: 

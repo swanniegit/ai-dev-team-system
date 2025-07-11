@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pm-agent
+  labels:
+    app: pm-agent
+    agent-type: project-manager
+    version: v1.0.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pm-agent
+  template:
+    metadata:
+      labels:
+        app: pm-agent
+        agent-type: project-manager
+        version: v1.0.0
+    spec:
+      containers:
+      - name: pm-agent
+        image: pm-agent:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: health
+        env:
+        - name: API_BASE_URL
+          value: "http://agentic-agile-api-internal:8000"
+        - name: PM_AGENT_NAME
+          value: "PM Agent Alpha"
+        - name: HEARTBEAT_INTERVAL
+          value: "60"
+        - name: ISSUE_CHECK_INTERVAL
+          value: "300"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: pm-agent-config
+      restartPolicy: Always 

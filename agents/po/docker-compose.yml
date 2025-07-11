@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  po-agent:
+    build: .
+    container_name: po-agent
+    environment:
+      - API_BASE_URL=http://host.docker.internal:8000
+      - PO_AGENT_NAME=Product Owner Agent
+      - HEARTBEAT_INTERVAL=60
+      - STORY_CHECK_INTERVAL=300
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    networks:
+      - default
+    restart: unless-stopped
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+    # Optional: Mount a log volume for persistent logs
+    volumes:
+      - po_agent_logs:/app/logs
+
+  po-agent-test:
+    build: .
+    container_name: po-agent-test
+    command: python test_po_agent.py
+    environment:
+      - API_BASE_URL=http://host.docker.internal:8000
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    networks:
+      - default
+    # Resource limits for test
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    volumes:
+      - po_agent_logs:/app/logs
+
+networks:
+  default:
+    external: true
+    name: ai-dev_default
+
+volumes:
+  po_agent_logs: 

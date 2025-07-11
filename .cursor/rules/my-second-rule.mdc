@@ -1,0 +1,4 @@
+---
+alwaysApply: true
+---
+use docker for setup deploy and test

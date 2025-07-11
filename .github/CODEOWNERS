@@ -1,0 +1,57 @@
+# Global owners
+* @your-username
+
+# API Hub
+/app/ @api-team
+/app/main.py @api-team
+/app/config.py @api-team
+
+# Database and Models
+/app/core/database.py @data-team
+/app/models/ @data-team
+
+# API Endpoints
+/app/api/ @api-team
+
+# Memory System
+/app/models/corporate_memory.py @memory-team
+/app/api/v1/endpoints/memory.py @memory-team
+/scripts/backup_memory.py @memory-team
+
+# Agents
+/agents/pm_agent/ @pm-team
+/agents/po_agent/ @po-team
+/agents/sm_agent/ @sm-team
+/agents/dev_agent/ @dev-team
+/agents/qa_agent/ @qa-team
+/agents/ar_agent/ @ar-team
+/agents/ad_agent/ @ad-team
+/agents/mb_agent/ @mb-team
+
+# Infrastructure
+/docker-compose.yml @devops-team
+/Dockerfile @devops-team
+/k8s/ @devops-team
+
+# Documentation
+/README.md @docs-team
+/SETUP.md @docs-team
+/DEPLOYMENT_SUMMARY.md @docs-team
+/AGENT_COMPLETION_SUMMARY.md @docs-team
+/MEMORY_SYSTEM_SUMMARY.md @docs-team
+/FUNCTIONAL_TECHNICAL_SPEC.md @docs-team
+
+# GitHub Actions
+/.github/workflows/ @devops-team
+/.github/ISSUE_TEMPLATE/ @docs-team
+/.github/pull_request_template.md @docs-team
+
+# Tests
+/tests/ @qa-team
+
+# Requirements
+/requirements*.txt @dev-team
+
+# Environment and Configuration
+/env.example @devops-team
+/.env* @devops-team 

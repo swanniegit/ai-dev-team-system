@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  sm-agent:
+    build: .
+    container_name: sm-agent
+    environment:
+      - API_BASE_URL=http://host.docker.internal:8000
+      - SM_AGENT_NAME=Scrum Master Agent
+      - HEARTBEAT_INTERVAL=60
+      - CEREMONY_CHECK_INTERVAL=300
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    networks:
+      - default
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+    volumes:
+      - sm_agent_logs:/app/logs
+
+  sm-agent-test:
+    build: .
+    container_name: sm-agent-test
+    command: python main.py
+    environment:
+      - API_BASE_URL=http://host.docker.internal:8000
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    volumes:
+      - sm_agent_logs:/app/logs
+
+networks:
+  default:
+    external: true
+    name: ai-dev_default
+
+volumes:
+  sm_agent_logs: 

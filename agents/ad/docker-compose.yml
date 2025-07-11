@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  ad-agent:
+    build: .
+    container_name: ad-agent
+    environment:
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - API_HUB_URL=${API_HUB_URL:-http://localhost:8000}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - GCP_CREDENTIALS=${GCP_CREDENTIALS}
+      - AZURE_CREDENTIALS=${AZURE_CREDENTIALS}
+      - CLOUD_PROVIDER=${CLOUD_PROVIDER:-aws}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./deployments:/app/deployments
+      - ./logs:/app/logs
+      - ./configs:/app/configs
+    ports:
+      - "8005:8005"
+    restart: unless-stopped
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-agile-network
+
+  api-hub:
+    image: agentic-agile-api:latest
+    container_name: api-hub
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    networks:
+      - agentic-agile-network
+
+networks:
+  agentic-agile-network:
+    driver: bridge 

@@ -1,0 +1,25 @@
+# Minimal requirements - essential dependencies only
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# Database
+sqlalchemy
+psycopg2-binary
+redis
+pymongo
+
+# Security
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Utilities
+python-multipart
+python-dotenv
+structlog
+
+# Testing
+pytest
+pytest-asyncio
+httpx 

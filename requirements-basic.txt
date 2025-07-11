@@ -1,0 +1,18 @@
+# Basic requirements - API structure only (no database)
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# Security (basic)
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Utilities
+python-multipart
+python-dotenv
+
+# Testing
+pytest
+pytest-asyncio
+httpx 

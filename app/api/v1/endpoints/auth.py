@@ -7,10 +7,11 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import Optional
 import structlog
+import uuid
 
 from app.core.database import get_db
 from app.models.user import User, UserCreate, UserResponse, UserLogin, Token
-from app.core.security import create_access_token, get_current_user
+from app.core.security import create_access_token, get_current_user, get_password_hash, verify_password
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -36,13 +37,15 @@ async def register_user(
                 detail="User with this email or username already exists"
             )
         
-        # Create new user (password hashing would be done here)
+        # Create new user with hashed password
+        hashed_password = get_password_hash(user.password)
         db_user = User(
+            id=str(uuid.uuid4()),
             email=user.email,
             username=user.username,
             full_name=user.full_name,
             role=user.role,
-            hashed_password="hashed_password_here"  # In real implementation, hash the password
+            hashed_password=hashed_password
         )
         
         db.add(db_user)
@@ -79,9 +82,8 @@ async def login_user(
                 detail="Incorrect username or password"
             )
         
-        # In a real implementation, verify password hash
-        # For now, just check if password matches (insecure!)
-        if form_data.password != "password":  # Replace with proper password verification
+        # Verify password hash
+        if not verify_password(form_data.password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password"

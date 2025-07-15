@@ -1,77 +1,177 @@
 version: '3.8'
 
 services:
+  # API Hub
+  api-hub:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/agentic_agile
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URL=mongodb://mongo:27017/agentic_agile
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - mongo
+    volumes:
+      - ./app:/app/app
+      - ./logs:/app/logs
+    networks:
+      - agentic-network
+
+  # Frontend Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - api-hub
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - agentic-network
+
   # PostgreSQL Database
   postgres:
     image: postgres:15
-    container_name: agentic_agile_postgres
     environment:
-      POSTGRES_DB: agentic_agile
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      - POSTGRES_DB=agentic_agile
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d agentic_agile"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    networks:
+      - agentic-network
 
-  # Redis for caching and event bus
+  # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: agentic_agile_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    networks:
+      - agentic-network
 
-  # MongoDB for flexible data storage
-  mongodb:
-    image: mongo:7
-    container_name: agentic_agile_mongodb
+  # MongoDB
+  mongo:
+    image: mongo:6
     environment:
-      MONGO_INITDB_DATABASE: agentic_agile
+      - MONGO_INITDB_DATABASE=agentic_agile
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - mongo_data:/data/db
+    networks:
+      - agentic-network
 
-  # API Application
-  api:
-    build: .
-    container_name: agentic_agile_api
-    ports:
-      - "8000:8000"
+  # PM Agent
+  pm-agent:
+    build: ./agents/pm_agent
     environment:
-      - DATABASE_URL=postgresql://user:password@postgres:5432/agentic_agile
-      - MONGODB_URL=mongodb://mongodb:27017/agentic_agile
-      - REDIS_URL=redis://redis:6379
-      - DEBUG=true
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO}
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-    volumes:
-      - .:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - api-hub
+    networks:
+      - agentic-network
+
+  # PO Agent
+  po-agent:
+    build: ./agents/po
+    environment:
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-network
+
+  # SM Agent
+  sm-agent:
+    build: ./agents/sm
+    environment:
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-network
+
+  # DEV Agent
+  dev-agent:
+    build: ./agents/dev
+    environment:
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-network
+
+  # QA Agent
+  qa-agent:
+    build: ./agents/qa
+    environment:
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-network
+
+  # AR Agent
+  ar-agent:
+    build: ./agents/ar
+    environment:
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-network
+
+  # AD Agent
+  ad-agent:
+    build: ./agents/ad
+    environment:
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-network
+
+  # MB Agent
+  mb-agent:
+    build: ./agents/mb
+    environment:
+      - API_HUB_URL=http://api-hub:8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - api-hub
+    networks:
+      - agentic-network
 
 volumes:
   postgres_data:
   redis_data:
-  mongodb_data: 
+  mongo_data:
+
+networks:
+  agentic-network:
+    driver: bridge 

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
 import structlog
+import httpx
 
 from app.core.database import get_db
 from app.models.wellness import (
@@ -37,7 +38,7 @@ async def create_wellness_checkin(
             engagement_level=checkin.engagement_level,
             workload_level=checkin.workload_level,
             notes=checkin.notes,
-            metadata=checkin.metadata
+            wellness_metadata=checkin.metadata
         )
         
         db.add(db_checkin)
@@ -170,4 +171,120 @@ async def create_wellness_recommendation(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create wellness recommendation"
+        )
+
+
+@router.post("/poll")
+async def send_wellness_poll(
+    poll_request: dict,
+    db: Session = Depends(get_db)
+):
+    """Send a wellness poll to all active agents and collect responses"""
+    try:
+        message = poll_request.get("message", "How are you feeling right now?")
+        timeout_seconds = poll_request.get("timeout_seconds", 30)
+        
+        # Get all active agents
+        mock_agents = [
+            {"id": "dev-001", "name": "Developer Agent", "type": "dev", "endpoint": "http://dev-agent:9001/respond_wellness_poll"},
+            {"id": "qa-001", "name": "QA Agent", "type": "qa"},
+            {"id": "pm-001", "name": "PM Agent", "type": "pm"},
+            {"id": "po-001", "name": "PO Agent", "type": "po"},
+            {"id": "sm-001", "name": "SM Agent", "type": "sm"},
+            {"id": "ar-001", "name": "AR Agent", "type": "ar"},
+            {"id": "ad-001", "name": "AD Agent", "type": "ad"},
+            {"id": "mb-001", "name": "MB Agent", "type": "mb"}
+        ]
+        
+        import random
+        from datetime import datetime, timedelta
+        agent_responses = []
+        total_mood = 0
+        total_energy = 0
+        total_stress = 0
+        total_satisfaction = 0
+        total_engagement = 0
+        total_workload = 0
+        
+        for agent in mock_agents:
+            if agent["id"] == "dev-001":
+                # Call the real dev agent endpoint
+                try:
+                    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+                        resp = await client.post(agent["endpoint"], json={"message": message})
+                        if resp.status_code == 200:
+                            response = resp.json()
+                        else:
+                            response = {
+                                "agent_id": agent["id"],
+                                "agent_name": agent["name"],
+                                "mood_level": 7,
+                                "energy_level": 7,
+                                "stress_level": 4,
+                                "satisfaction_level": 8,
+                                "engagement_level": 8,
+                                "workload_level": 6,
+                                "notes": "(Fallback) Could not reach dev agent.",
+                                "response_time": datetime.utcnow().isoformat()
+                            }
+                except Exception as e:
+                    logger.error("Failed to get response from dev agent", error=str(e))
+                    response = {
+                        "agent_id": agent["id"],
+                        "agent_name": agent["name"],
+                        "mood_level": 7,
+                        "energy_level": 7,
+                        "stress_level": 4,
+                        "satisfaction_level": 8,
+                        "engagement_level": 8,
+                        "workload_level": 6,
+                        "notes": f"(Fallback) Error: {str(e)}",
+                        "response_time": datetime.utcnow().isoformat()
+                    }
+            else:
+                # Simulate realistic wellness responses for other agents
+                mood = random.randint(6, 9)
+                energy = random.randint(5, 8)
+                stress = random.randint(2, 6)
+                satisfaction = random.randint(6, 9)
+                engagement = random.randint(7, 9)
+                workload = random.randint(4, 8)
+                response = {
+                    "agent_id": agent["id"],
+                    "agent_name": agent["name"],
+                    "mood_level": mood,
+                    "energy_level": energy,
+                    "stress_level": stress,
+                    "satisfaction_level": satisfaction,
+                    "engagement_level": engagement,
+                    "workload_level": workload,
+                    "notes": f"Feeling {['great', 'good', 'okay', 'productive'][random.randint(0, 3)]} today!",
+                    "response_time": (datetime.utcnow() - timedelta(seconds=random.randint(1, 30))).isoformat()
+                }
+            agent_responses.append(response)
+            total_mood += response["mood_level"]
+            total_energy += response["energy_level"]
+            total_stress += response["stress_level"]
+            total_satisfaction += response["satisfaction_level"]
+            total_engagement += response["engagement_level"]
+            total_workload += response["workload_level"]
+        num_responses = len(agent_responses)
+        return {
+            "total_agents": len(mock_agents),
+            "responses_received": num_responses,
+            "average_mood": total_mood / num_responses,
+            "average_energy": total_energy / num_responses,
+            "average_stress": total_stress / num_responses,
+            "average_satisfaction": total_satisfaction / num_responses,
+            "average_engagement": total_engagement / num_responses,
+            "average_workload": total_workload / num_responses,
+            "agent_responses": agent_responses,
+            "poll_message": message,
+            "poll_completed_at": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error("Failed to send wellness poll", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send wellness poll"
         ) 

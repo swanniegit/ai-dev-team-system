@@ -8,6 +8,11 @@ import sys
 import os
 from datetime import datetime
 from typing import Dict, Any, List
+import threading
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+import random
+import uvicorn
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from base.agent_base import AgentBase
@@ -100,12 +105,50 @@ class DEVAgent(AgentBase):
             "code_reviews_completed": self.stats["code_reviews_completed"],
             "tests_written": self.stats["tests_written"]
         }
+
+def create_fastapi_app(agent_id="dev-001", agent_name="Developer Agent"):
+    app = FastAPI()
+
+    @app.post("/respond_wellness_poll")
+    async def respond_wellness_poll():
+        # Simulate a wellness response
+        mood = random.randint(6, 9)
+        energy = random.randint(5, 8)
+        stress = random.randint(2, 6)
+        satisfaction = random.randint(6, 9)
+        engagement = random.randint(7, 9)
+        workload = random.randint(4, 8)
+        response = {
+            "agent_id": agent_id,
+            "agent_name": agent_name,
+            "mood_level": mood,
+            "energy_level": energy,
+            "stress_level": stress,
+            "satisfaction_level": satisfaction,
+            "engagement_level": engagement,
+            "workload_level": workload,
+            "notes": f"Feeling {random.choice(['great', 'good', 'okay', 'productive'])} today!",
+            "response_time": datetime.utcnow().isoformat()
+        }
+        return JSONResponse(content=response)
+
+    return app
+
 def main():
     pm_agent_path = os.path.join(os.path.dirname(__file__), '..', 'pm_agent')
     sys.path.append(pm_agent_path)
     from api_client import APIClient
     api_client = APIClient()
     agent = DEVAgent(api_client)
+
+    # Start FastAPI server in a background thread
+    def run_fastapi():
+        app = create_fastapi_app()
+        uvicorn.run(app, host="0.0.0.0", port=9001, log_level="info")
+
+    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
+    fastapi_thread.start()
+
     try:
         success = agent.start()
         if not success:

@@ -1,5 +1,37 @@
 # 🚀 Agentic Agile System - Setup Guide
 
+# Environment Variable and Service Validation (First Step)
+
+Before setup or deployment, always validate your environment and services:
+
+1. Copy `env.example` to `.env` if you haven't already.
+2. Fill in all required environment variables in `.env` (see checklist below).
+3. Run the validation script:
+
+   ```sh
+   python scripts/validate_env_and_services.py
+   ```
+
+4. If any variables are missing or services are not running, fix them before proceeding.
+
+## Required Environment Variables Checklist
+
+- [ ] DATABASE_URL
+- [ ] MONGODB_URL
+- [ ] REDIS_URL
+- [ ] SECRET_KEY
+- [ ] ALGORITHM
+- [ ] ACCESS_TOKEN_EXPIRE_MINUTES
+- [ ] SLACK_WEBHOOK_URL
+- [ ] GITHUB_WEBHOOK_SECRET
+- [ ] API_BASE_URL
+- [ ] ANTHROPIC_API_KEY
+- [ ] GITHUB_TOKEN (if using GitHub agents)
+- [ ] GITHUB_REPO (if using GitHub agents)
+- [ ] GITLAB_WEBHOOK_TOKEN (if using GitLab)
+
+---
+
 ## 🔧 **Step 1: Fix Python Installation**
 
 ### **Option A: Install Python from Microsoft Store (Recommended for Windows)**

@@ -345,6 +345,14 @@ pytest --cov=app --cov=agents --cov-report=html
 
 ---
 
+## Slack Integration
+
+- [ ] Create a Slack channel for the project
+- [ ] Create a Slack App/Bot and add to workspace
+- [ ] Add Bot User OAuth Token to .env and env.example as SLACK_BOT_TOKEN
+- [ ] Test Slack notifications using scripts/send_slack_test.py
+- [ ] Document Slack integration in README
+
 ## ✅ **Maintenance Completion Checklist**
 
 After completing maintenance:
@@ -362,3 +370,34 @@ After completing maintenance:
 **Last Updated**: December 2024  
 **Next Review**: January 2025  
 **Maintained By**: [Your Name] 
+
+# Environment Variable and Service Validation (First Step)
+
+Before troubleshooting or deploying, always validate your environment and services:
+
+1. Ensure your `.env` file is present and all required variables are set (see below).
+2. Run the validation script:
+
+   ```sh
+   python scripts/validate_env_and_services.py
+   ```
+
+3. If any variables are missing or services are not running, fix them before proceeding.
+
+## Required Environment Variables Checklist
+
+- [ ] DATABASE_URL
+- [ ] MONGODB_URL
+- [ ] REDIS_URL
+- [ ] SECRET_KEY
+- [ ] ALGORITHM
+- [ ] ACCESS_TOKEN_EXPIRE_MINUTES
+- [ ] SLACK_WEBHOOK_URL
+- [ ] GITHUB_WEBHOOK_SECRET
+- [ ] API_BASE_URL
+- [ ] ANTHROPIC_API_KEY
+- [ ] GITHUB_TOKEN (if using GitHub agents)
+- [ ] GITHUB_REPO (if using GitHub agents)
+- [ ] GITLAB_WEBHOOK_TOKEN (if using GitLab)
+
+--- 

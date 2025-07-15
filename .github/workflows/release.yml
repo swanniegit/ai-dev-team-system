@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Python Semantic Release
+        uses: python-semantic-release/python-semantic-release@v8.7.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_username: ${{ github.actor }}
+          github_email: ${{ github.actor }}@users.noreply.github.com
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## What's Changed
+            
+            This release includes the following changes:
+            
+            ${{ steps.semantic.outputs.notes }}
+            
+            ## Installation
+            
+            ```bash
+            # Update your deployment
+            docker-compose pull
+            docker-compose up -d
+            ```
+            
+            ## Breaking Changes
+            
+            ${{ steps.semantic.outputs.breaking }}
+            
+            ## Contributors
+            
+            ${{ steps.semantic.outputs.contributors }}
+          draft: false
+          prerelease: false 

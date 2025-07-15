@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-agile-system"
+version = "1.0.0"
+description = "A central, extensible API hub that orchestrates all agent and system interactions for the Agentic Agile System"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Agentic Agile System Team", email = "team@agenticagile.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.1",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "sqlalchemy>=2.0.23",
+    "psycopg2-binary>=2.9.9",
+    "pymongo>=4.6.0",
+    "redis>=5.0.1",
+    "structlog>=23.2.0",
+    "slack_sdk",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "agents*"]
+
+[tool.semantic_release]
+version_variable = [
+    "app/config.py:version",
+    "pyproject.toml:version"
+]
+version_toml = "pyproject.toml"
+build_command = "pip install build && python -m build"
+dist_path = "dist/"
+upload_to_pypi = false
+upload_to_release = true
+changelog_file = "CHANGELOG.md"
+commit_message = "chore(release): {version} [skip ci]"
+commit_parser = "angular"
+branch = "main"
+prerelease_branch = "develop"
+prerelease_tag = "rc"
+major_on_zero = false 

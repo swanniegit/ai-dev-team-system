@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     max_agents_per_type: int = Field(default=5, env="MAX_AGENTS_PER_TYPE")
     agent_heartbeat_timeout: int = Field(default=300, env="AGENT_HEARTBEAT_TIMEOUT")  # 5 minutes
     
+    # Slack Integration
+    slack_bot_token: Optional[str] = Field(default=None, env="SLACK_BOT_TOKEN")
+    
+    # Git Integration
+    github_webhook_secret: Optional[str] = Field(default=None, env="GITHUB_WEBHOOK_SECRET")
+    gitlab_webhook_token: Optional[str] = Field(default=None, env="GITLAB_WEBHOOK_TOKEN")
+    api_base_url: Optional[str] = Field(default="http://localhost:8000", env="API_BASE_URL")
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

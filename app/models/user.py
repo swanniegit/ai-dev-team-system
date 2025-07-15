@@ -2,11 +2,11 @@
 User models for the Agentic Agile System
 """
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer, Text
+from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer, Text, Index
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -30,12 +30,20 @@ class User(Base):
     username = Column(String(100), unique=True, index=True, nullable=False)
     full_name = Column(String(200))
     hashed_password = Column(String(255), nullable=False)
-    role = Column(String(20), default=UserRole.VIEWER)
-    is_active = Column(Boolean, default=True)
+    role = Column(String(20), default=UserRole.VIEWER, index=True)
+    is_active = Column(Boolean, default=True, index=True)
     user_metadata = Column(JSON, default=dict)  # Renamed from metadata to avoid conflict
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_login = Column(DateTime, nullable=True)
+    last_login = Column(DateTime, nullable=True, index=True)
+    
+    # Composite indexes for performance optimization
+    __table_args__ = (
+        Index('idx_user_auth', 'username', 'is_active'),
+        Index('idx_user_email_auth', 'email', 'is_active'),
+        Index('idx_user_role_active', 'role', 'is_active'),
+        Index('idx_user_login_activity', 'last_login', 'is_active'),
+    )
 
 
 class UserBase(BaseModel):
@@ -45,11 +53,57 @@ class UserBase(BaseModel):
     full_name: Optional[str] = Field(None, max_length=200, description="Full name")
     role: UserRole = Field(default=UserRole.VIEWER, description="User role")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    
+    # Import validation functions at class level to avoid circular imports
+    @validator('email')
+    def validate_email_security(cls, v):
+        """Enhanced email validation with security checks"""
+        from app.core.validation import validate_email_format
+        return validate_email_format(cls, v)
+    
+    @validator('username')
+    def validate_username_format(cls, v):
+        """Validate username format and security"""
+        from app.core.validation import validate_username
+        return validate_username(cls, v)
+    
+    @validator('full_name')
+    def validate_full_name(cls, v):
+        """Validate full name"""
+        if v is None:
+            return v
+        
+        from app.core.validation import validate_secure_string, normalize_whitespace
+        v = validate_secure_string(cls, v)
+        v = normalize_whitespace(v)
+        
+        # Additional full name specific validation
+        if len(v.strip()) < 2:
+            raise ValueError("Full name must be at least 2 characters")
+        
+        # Only allow letters, spaces, and common name characters
+        import re
+        if not re.match(r"^[a-zA-Z\s\-'\.]+$", v):
+            raise ValueError("Full name contains invalid characters")
+        
+        return v
+    
+    @validator('metadata')
+    def validate_metadata_safe(cls, v):
+        """Validate metadata is safe and JSON-serializable"""
+        from app.core.validation import validate_json_safe
+        return validate_json_safe(v)
 
 
 class UserCreate(UserBase):
     """Pydantic model for creating users"""
-    password: str = Field(..., min_length=8, description="Password")
+    password: str = Field(..., min_length=8, max_length=128, description="Password")
+    
+    @validator('password')
+    def validate_password_security(cls, v):
+        """Validate password strength and security"""
+        from app.core.validation import validate_password_strength
+        return validate_password_strength(cls, v)
 
 
 class UserUpdate(BaseModel):

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer, Text, Float
+from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer, Text, Float, Index
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -42,7 +42,17 @@ class CorporateMemory(Base):
     usage_count = Column(Integer, default=0)
     last_accessed = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
-    metadata = Column(JSON, nullable=True)
+    memory_metadata = Column(JSON, nullable=True)
+    
+    # Composite indexes for performance optimization
+    __table_args__ = (
+        Index('idx_memory_search', 'memory_type', 'category', 'timestamp'),
+        Index('idx_agent_memory', 'agent_id', 'timestamp'),
+        Index('idx_project_memory', 'project_id', 'is_active'),
+        Index('idx_memory_confidence', 'confidence_score', 'is_active'),
+        Index('idx_memory_usage', 'usage_count', 'last_accessed'),
+        Index('idx_active_memory_by_type', 'is_active', 'memory_type', 'timestamp'),
+    )
 
 
 class CorporateMemoryCreate(BaseModel):
@@ -57,7 +67,7 @@ class CorporateMemoryCreate(BaseModel):
     project_id: Optional[str] = None
     tags: Optional[List[str]] = None
     confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
-    metadata: Optional[Dict[str, Any]] = None
+    memory_metadata: Optional[Dict[str, Any]] = None
 
 
 class CorporateMemoryResponse(BaseModel):
@@ -77,7 +87,7 @@ class CorporateMemoryResponse(BaseModel):
     usage_count: int
     last_accessed: Optional[datetime]
     is_active: bool
-    metadata: Optional[Dict[str, Any]]
+    memory_metadata: Optional[Dict[str, Any]]
     
     class Config:
         from_attributes = True
@@ -104,4 +114,4 @@ class MemoryUpdate(BaseModel):
     tags: Optional[List[str]] = None
     confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
     is_active: Optional[bool] = None
-    metadata: Optional[Dict[str, Any]] = None 
+    memory_metadata: Optional[Dict[str, Any]] = None 

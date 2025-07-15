@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: agentic-agile-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agentic-agile-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: agentic-agile-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: LOG_LEVEL
+        value: INFO
+    healthCheckPath: /health
+
+databases:
+  - name: agentic-agile-db
+    databaseName: agentic_agile
+    user: agentic_user
+    plan: free
+
+services:
+  - type: redis
+    name: agentic-agile-redis
+    plan: free

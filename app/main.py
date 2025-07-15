@@ -15,9 +15,10 @@ from typing import Dict, Any
 
 from app.config import settings
 from app.api.v1.api import api_router
-from app.core.middleware import AuditMiddleware, RateLimitMiddleware
-from app.core.database import init_db, close_db
+from app.core.middleware import AuditMiddleware, RateLimitMiddleware, SecurityMiddleware, RequestSizeLimitMiddleware
+from app.core.database import init_db, close_db, get_redis
 from app.core.logging import setup_logging
+from app.core.event_bus import event_bus
 
 # Setup structured logging
 setup_logging()
@@ -32,10 +33,32 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized successfully")
     
+    # Initialize event bus
+    await event_bus.connect()
+    logger.info("Event bus initialized successfully")
+    
+    # Initialize cache if needed
+    try:
+        from app.core.cache import cache_manager
+        await cache_manager.connect()
+        logger.info("Cache manager initialized successfully")
+    except Exception as e:
+        logger.warning("Cache manager initialization failed", error=str(e))
+    
     yield
     
     # Shutdown
     logger.info("Shutting down Agentic Agile System API Hub")
+    await event_bus.disconnect()
+    
+    # Disconnect cache
+    try:
+        from app.core.cache import cache_manager
+        await cache_manager.disconnect()
+        logger.info("Cache manager disconnected")
+    except Exception as e:
+        logger.warning("Cache manager disconnect failed", error=str(e))
+    
     await close_db()
     logger.info("Database connections closed")
 
@@ -86,22 +109,27 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-# Add middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Add middleware (order matters - last added executes first)
+# Remove the default CORS middleware since SecurityMiddleware handles it
 
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"]  # Configure appropriately for production
 )
 
+# Add our custom middleware stack
+async def setup_rate_limiting():
+    """Setup rate limiting with Redis client"""
+    try:
+        redis_client = get_redis()
+        return RateLimitMiddleware(app, redis_client)
+    except Exception as e:
+        logger.warning("Redis not available for rate limiting", error=str(e))
+        return RateLimitMiddleware(app, None)
+
 app.add_middleware(AuditMiddleware)
-app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RequestSizeLimitMiddleware, max_size=10 * 1024 * 1024)  # 10MB limit
+app.add_middleware(SecurityMiddleware)  # Handles CORS and security headers
 
 
 # Global exception handler
@@ -146,27 +174,68 @@ async def health_check():
 @app.get("/ready")
 async def readiness_check():
     """Readiness check endpoint for orchestration"""
-    # Add database connectivity check here
-    return {
-        "status": "ready",
-        "service": settings.project_name,
-        "version": settings.version,
-        "timestamp": time.time()
-    }
+    # Check database connectivity
+    try:
+        from app.core.database import health_check
+        db_health = await health_check()
+        
+        # Check if all critical services are healthy
+        critical_services = ['postgresql', 'redis']
+        all_healthy = all(
+            db_health.get(service, {}).get('status') == 'healthy' 
+            for service in critical_services
+        )
+        
+        return {
+            "status": "ready" if all_healthy else "not_ready",
+            "service": settings.project_name,
+            "version": settings.version,
+            "timestamp": time.time(),
+            "services": db_health
+        }
+    except Exception as e:
+        logger.error("Readiness check failed", error=str(e))
+        return {
+            "status": "not_ready",
+            "service": settings.project_name,
+            "version": settings.version,
+            "timestamp": time.time(),
+            "error": str(e)
+        }
 
 
 # Metrics endpoint (for Prometheus)
 @app.get("/metrics")
 async def metrics():
     """Metrics endpoint for monitoring"""
-    # Add actual metrics collection here
-    return {
-        "requests_total": 0,
-        "requests_duration_seconds": 0.0,
-        "active_agents": 0,
-        "total_issues": 0,
-        "wellness_checkins_today": 0
-    }
+    try:
+        # Get cache statistics
+        from app.core.cache import cache_manager
+        cache_stats = await cache_manager.get_stats()
+        
+        # Get database connection stats
+        from app.core.database import get_connection_stats
+        db_stats = get_connection_stats()
+        
+        # Get event bus info
+        event_stats = await event_bus.get_stream_info() if event_bus.redis_client else {}
+        
+        return {
+            "service": settings.project_name,
+            "version": settings.version,
+            "timestamp": time.time(),
+            "cache": cache_stats,
+            "database": db_stats,
+            "event_bus": event_stats
+        }
+    except Exception as e:
+        logger.error("Metrics collection failed", error=str(e))
+        return {
+            "service": settings.project_name,
+            "version": settings.version,
+            "timestamp": time.time(),
+            "error": str(e)
+        }
 
 
 # Include API router

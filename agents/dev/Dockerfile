@@ -22,6 +22,8 @@ ENV DEV_AGENT_NAME="Developer Agent"
 ENV HEARTBEAT_INTERVAL=60
 ENV CODE_CHECK_INTERVAL=300
 
+EXPOSE 9001
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://host.docker.internal:8000/health')" || exit 1
 
